@@ -1,0 +1,9 @@
+redis
+fastapi
+uvicorn
+websockets
+pydantic
+pytest
+pytest-asyncio
+pytest_mock
+prompt-toolkit

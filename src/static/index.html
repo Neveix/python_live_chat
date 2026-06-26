@@ -1,0 +1,198 @@
+<html>
+<head>
+    <style>
+        /* Dark theme base */
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+            margin: 20px;
+            padding: 0;
+        }
+
+        h2, h4 {
+            color: #ffffff;
+        }
+
+        hr {
+            border-color: #333;
+        }
+
+        #message-box {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            background-color: #0d0d0d;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        #message-box div {
+            margin: 5px 0;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        /* System messages style */
+        #message-box div.system {
+            color: #888;
+            font-style: italic;
+        }
+
+        /* User messages */
+        #message-box div.user {
+            color: #4ec9b0;
+        }
+
+        #room-setup {
+            margin: 10px 0 10px 0;
+        }
+
+        #room-list {
+            margin: 10px 0 10px 0;
+            border: 1px solid #333;
+            overflow-y: auto;
+            background-color: #0d0d0d;
+            border-radius: 4px;
+        }
+
+        /* Room items styling */
+        .room-item {
+            padding: 8px;
+            margin: 4px 0;
+            cursor: pointer;
+            color: #61afef;
+            border-bottom: 1px solid #222;
+        }
+
+        .room-item:hover {
+            background-color: #2a2a2a;
+            color: #98c379;
+        }
+
+        input {
+            padding: 8px;
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            border-radius: 4px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #61afef;
+        }
+
+        input::placeholder {
+            color: #888;
+        }
+
+        #message-input {
+            width: 80%;
+        }
+
+        button {
+          padding: 8px 16px;
+          background-color: #0e639c;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #1177bb;
+        }
+        
+        button:active {
+            background-color: #0a4c73;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            color: #666666;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
+        button:disabled:hover {
+            background-color: #cccccc;
+        }
+        
+        button:disabled:active {
+            background-color: #cccccc;
+        }
+
+        #pre-room-list {
+            margin: 10px 0;
+        }
+
+        #loading-rooms-text {
+            color: #888;
+            font-style: italic;
+        }
+
+        .room-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .error-message {
+            display: none;
+            color: #d32f2f;
+            font-size: 14px;
+            margin-top: 5px;
+            padding: 4px 8px;
+            background-color: #ffebee;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Chat</h2>
+    <div id="room-setup">
+        <input type="text" id="username" placeholder="username" value="unknown">
+        <input type="text" id="room-name" placeholder="room-name">
+        <button id="create-room" onclick="createRoom()">Create Room</button>
+        <div class="error-message" id="room-error"></div>
+        <hr />
+        <h4>Available Rooms:</h4>
+        <div id="pre-room-list">
+            <div id="loading-rooms-text">Loading Rooms...</div>
+            <div id="room-list"></div>
+        </div>
+        <!-- <hr /> -->
+        <button id="leave-room">Leave Room</button>
+        <div class="error-message" id="connection-error"></div>
+    </div>
+    <div id="chat-area">
+        <div id="message-box">
+            <!-- messages being added automatically-->
+        </div>
+        <div style="margin: 10 0 0 0;">
+            <input type="text" id="message-input" placeholder="Type a message...">
+            <button id="send-btn" onclick="sendMessage()">Send</button>
+            <div class="error-message" id="message-error"></div>
+        </div>
+    </div>
+
+   <script src="src/static/app.js"></script> 
+</body>
+</html>
