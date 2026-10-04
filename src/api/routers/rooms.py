@@ -1,3 +1,5 @@
+import traceback
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
@@ -20,9 +22,12 @@ class GetRoomsResponse(BaseModel):
     rooms: list[Room]
 
 
+depends_get_chat_service = Depends(get_chat_service)
+
+
 @router.get("", response_model=GetRoomsResponse)
 async def get_rooms(
-    chat_service: ChatService = Depends(get_chat_service),
+    chat_service: ChatService = depends_get_chat_service,
 ) -> GetRoomsResponse:
     rooms = await chat_service.get_rooms.use()
     return GetRoomsResponse(
@@ -51,7 +56,7 @@ class CreateRoomResponse(BaseModel):
 @router.post("")
 async def create_room(
     request: CreateRoomRequest,
-    chat_service: ChatService = Depends(get_chat_service),
+    chat_service: ChatService = depends_get_chat_service,
 ) -> CreateRoomResponse:
     try:
         room = await chat_service.create_room.use(request.room_name, request.username)
@@ -72,6 +77,10 @@ async def create_room(
             success=False,
             detail="Room already exists",
         )
+
+    except Exception as e:
+        traceback.print_exc()
+        raise
 
 
 # class JoinRoomResponse(BaseModel):
@@ -115,4 +124,3 @@ async def create_room(
 #             success=success,
 #             detail="User is no longer in the room"
 #         )
-
