@@ -2,10 +2,9 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from .chat_service.core.exceptions import RepoError, RoomNotFoundError
-from .api.routers.rooms import router as rooms_router
 from .api.routers.messages import router as messages_router
-
+from .api.routers.rooms import router as rooms_router
+from .chat_service.core.exceptions import RepoError, RoomNotFoundError
 
 app = FastAPI()
 app.include_router(messages_router)
@@ -21,7 +20,7 @@ class RegularExceptionInfo(BaseModel):
 async def handle_room_not_found_error(request: Request, exc: RoomNotFoundError):
     room_id = request.path_params.get("room_id")
     room_id_str = "" if room_id is None else f"{room_id} "
-    detail = f"Room {room_id_str}not found"
+    detail = f"Room {room_id_str} not found"
 
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
