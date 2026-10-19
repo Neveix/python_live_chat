@@ -75,7 +75,7 @@ class MessagesRepoRedis(MessageRepo):
             async def generator():
                 try:
                     while True:
-                        msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=0.5)
+                        msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=0.1)
                         if msg and msg["type"] == "message":
                             msg = deserialize_message(json.loads(msg["data"]))
                             yield msg

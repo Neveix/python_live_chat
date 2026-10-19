@@ -1,14 +1,17 @@
 import argparse
 import asyncio
+from hashlib import sha256
+import hashlib
 import json
 import random
+import time
 from typing import ClassVar
 from urllib.parse import quote
-
+from pathlib import Path
+import uuid
 import websockets
 
-# from prompt_toolkit import PromptSession
-# from prompt_toolkit.patch_stdout import patch_stdout
+from .sync_logger import ClientLogger
 
 
 pronouns = [
@@ -314,7 +317,13 @@ starters = [
 ]
 
 
-def generate_message():
+def generate_message() -> str:
+    id = str(uuid.uuid4())
+    body = _generate_message_body()
+    return f"{body} [ID={id}]"
+
+def _generate_message_body():
+
     # 15 различных паттернов для разнообразия
     pattern = random.randint(1, 15)
 
@@ -703,6 +712,7 @@ class ClientsBatch:
         client_count: int,
         msg_delay: float,
         msg_delay_shift: float,
+        logger: ClientLogger,
     ):
 
         cls.clients = {
@@ -712,6 +722,7 @@ class ClientsBatch:
                     room_id=room_id,
                     msg_delay=msg_delay,
                     msg_delay_shift=msg_delay_shift,
+                    logger=logger,
                 )
             )
             for _ in range(client_count)
@@ -733,6 +744,8 @@ class ClientsBatch:
 
 
 async def test_chat_client(
+    *,
+    logger: ClientLogger,
     port: int = 47116,
     room_id: int = 1,
     msg_delay: float = 10,
@@ -749,12 +762,14 @@ async def test_chat_client(
 
                 if text.strip():
                     print(f"sending message {username} {text}")
+                    sent_monotonic_ns = time.monotonic_ns()
                     await websocket.send(json.dumps({"text": text}))
+                    logger.sent(text, sent_monotonic_ns)
 
                 await asyncio.sleep(msg_delay + random.random() * msg_delay_shift)
 
         except websockets.exceptions.ConnectionClosed:
-            pass
+            print("connection closed")
 
         finally:
             print(f"sending messages finished {username}")
@@ -762,8 +777,6 @@ async def test_chat_client(
     try:
         async with websockets.connect(uri) as websocket:
             await send_messages()
-            print("send_messages finished!")
-        print("send_messages finished! 2")
 
     except websockets.exceptions.WebSocketException as e:
         print(f"❌ Connection failed: {e}")
@@ -780,6 +793,7 @@ async def test_chat_client(
 
 async def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--run-id", "-i", type=int, default=1, dest="run_id")
     parser.add_argument("--port", "-p", type=int, default=47116)
     parser.add_argument("--room", "-r", type=int, default=None)
     parser.add_argument("--clients", "-c", type=int, default=1)
@@ -789,17 +803,11 @@ async def main():
     program_name = parser.prog
 
     if parsed.room is None:
-        print(f"room id expected. Pass it with `python {program_name} --room <id>`")
+        print(f"room id expected. Pass it with `{program_name} --room <id>`")
         exit(1)
         
-    room_id: int
-    try:
-        room_id = int(parsed.room)
-    except:
-        print(f"cannot get room id from {parsed.room!r}")
-        exit(1)
-
-
+    run_id: int = parsed.run_id
+    room_id = parsed.room
     client_count: int = parsed.clients
     port: int = parsed.port
 
@@ -810,6 +818,7 @@ async def main():
             client_count,
             parsed.msg_delay,
             parsed.msg_delay_shift,
+            logger=ClientLogger(Path("log") / f"spam_bots-{run_id}.txt")
         )
     except asyncio.CancelledError:
         pass
