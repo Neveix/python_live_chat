@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, status
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from .api.routers.messages import router as messages_router
 from .api.routers.rooms import router as rooms_router
@@ -10,6 +11,7 @@ app = FastAPI()
 app.include_router(messages_router)
 app.include_router(rooms_router)
 
+Instrumentator().instrument(app).expose(app)
 
 class RegularExceptionInfo(BaseModel):
     error_type: str

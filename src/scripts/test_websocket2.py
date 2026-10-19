@@ -3,7 +3,6 @@ import asyncio
 import json
 import random
 from typing import ClassVar
-import typing
 from urllib.parse import quote
 
 import websockets
@@ -719,20 +718,18 @@ class ClientsBatch:
         }
 
         pending: set[asyncio.Task] = cls.clients
-        while pending:
-            try:
-                print("awaiting")
+        try:
+            while pending:
                 _, pending = await asyncio.wait(
                     pending,
                     return_when=asyncio.FIRST_COMPLETED,
                 )
                 cls.clients = pending
                 print(f"Still have {cls.count_active_clients()} clients")
-            except asyncio.CancelledError:
-                pass
 
-        for task in pending:
-            task.cancel()
+        finally:
+            for task in pending:
+                task.cancel()
 
 
 async def test_chat_client(
@@ -797,13 +794,16 @@ async def main():
     client_count: int = parsed.clients
     port: int = parsed.port
 
-    await ClientsBatch.run(
-        port,
-        room_id,
-        client_count,
-        parsed.msg_delay,
-        parsed.msg_delay_shift,
-    )
+    try:
+        await ClientsBatch.run(
+            port,
+            room_id,
+            client_count,
+            parsed.msg_delay,
+            parsed.msg_delay_shift,
+        )
+    except asyncio.CancelledError:
+        pass
 
 
 if __name__ == "__main__":

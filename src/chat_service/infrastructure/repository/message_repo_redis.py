@@ -74,10 +74,11 @@ class MessagesRepoRedis(MessageRepo):
             
             async def generator():
                 try:
-                    async for data in pubsub.listen():
-                        if data["type"] == "message":
-                            data = deserialize_message(json.loads(data["data"]))
-                            yield data
+                    while True:
+                        msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=0.5)
+                        if msg and msg["type"] == "message":
+                            msg = deserialize_message(json.loads(msg["data"]))
+                            yield msg
                     
                 except TimeoutError as e:
                     raise ListenTimeoutError() from e
