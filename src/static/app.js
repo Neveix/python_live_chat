@@ -236,7 +236,7 @@ async function updateRooms() {
   const data = await response.json();
   roomList.innerHTML = ""
   data["rooms"].forEach(room => {
-    roomList.innerHTML += `\n<div class="room-item" onclick="joinRoom('${room.id}')">${room.creator}: ${room.name}</div>`;
+    roomList.innerHTML += `\n<div class="room-item" onclick="joinRoom('${room.id}')">[${room.id}] ${room.creator}: ${room.name}</div>`;
   });
   if (data["rooms"].length > 0) {
     loadingRooms.textContent = ""

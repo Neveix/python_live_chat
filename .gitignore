@@ -3,4 +3,4 @@
 .pytest_cache
 icons.json
 __pycache__
-scripts/
+./temp

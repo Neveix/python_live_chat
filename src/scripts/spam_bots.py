@@ -786,10 +786,19 @@ async def main():
     parser.add_argument("--delay", type=float, default=10, dest="msg_delay")
     parser.add_argument("--delay-shift", type=float, default=10, dest="msg_delay_shift")
     parsed = parser.parse_args()
+    program_name = parser.prog
+
     if parsed.room is None:
-        room_id = int(input("Enter room id (int): "))
-    else:
+        print(f"room id expected. Pass it with `python {program_name} --room <id>`")
+        exit(1)
+        
+    room_id: int
+    try:
         room_id = int(parsed.room)
+    except:
+        print(f"cannot get room id from {parsed.room!r}")
+        exit(1)
+
 
     client_count: int = parsed.clients
     port: int = parsed.port
