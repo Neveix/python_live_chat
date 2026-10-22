@@ -9,11 +9,13 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ValidationError
 import websockets
 
+from src.utils.message_logger import MessageLogger
+
 from ... import metrics
 
 from ...chat_service.core.exceptions import RepoError, RoomNotFoundError
 from ...chat_service.core.models import Message, RoomJoinResult, UserMessage
-from ..dependencies import get_chat_service
+from ..dependencies import get_chat_service, get_message_logger
 from ...chat_service.core.interfaces import ChatService
 
 
@@ -121,7 +123,7 @@ async def _send_history(websocket: WebSocket, join_result: RoomJoinResult):
     )
 
 
-async def _send_new_messages(
+async def _send_new_messages_task(
     websocket: WebSocket,
     chat_service: ChatService,
     room_id: int,
@@ -157,10 +159,12 @@ async def _receive_new_messages(
     room_id: int,
     username: str,
     send_task: asyncio.Task[None],
+    message_logger: MessageLogger,
 ):
     try:
         while True:
             message_data = await websocket.receive_text()
+            recv_monotonic_ns = time.monotonic_ns()
             metrics.MSG_RECEIVED.inc()
             try:
                 message = IngoingMessage.model_validate_json(message_data)
@@ -173,6 +177,8 @@ async def _receive_new_messages(
                     ).model_dump_json()
                 )
                 continue
+
+            message_logger.srv_recv(message.text, recv_monotonic_ns)
 
             try:
                 await chat_service.send_message.use(
@@ -214,6 +220,7 @@ async def messages_websocket(
     room_id: int,
     username: str,
     chat_service: ChatService = Depends(get_chat_service),
+    message_logger: MessageLogger = Depends(get_message_logger),
 ):
     await websocket.accept()
 
@@ -226,10 +233,10 @@ async def messages_websocket(
     try:
         await _send_history(websocket, join_result)
 
-        send_task = await _send_new_messages(websocket, chat_service, room_id, username)
+        send_task = await _send_new_messages_task(websocket, chat_service, room_id, username)
 
         await _receive_new_messages(
-            websocket, chat_service, room_id, username, send_task
+            websocket, chat_service, room_id, username, send_task, message_logger,
         )
 
     except:

@@ -8,14 +8,14 @@ import websockets
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 
-from .sync_logger import ClientLogger
+from ..utils.message_logger import MessageLogger, MessageLoggerImpl
 
 
 async def run_observer(*,
         port: int,
         room_id: int,
         username: str,
-        logger: ClientLogger,
+        logger: MessageLogger,
     ):
     uri = f"ws://localhost:{port}/ws/messages/{room_id}/{username}"
     try:
@@ -70,7 +70,7 @@ if __name__ == "__main__":
         port = port,
         room_id = room_id,
         username = "spam_observer",
-        logger=ClientLogger(Path("log") / f"spam_bots-{run_id}.txt")
+        logger=MessageLoggerImpl(Path("log") / f"spam_bots-{run_id}.txt")
     ))
 
 

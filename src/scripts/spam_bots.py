@@ -11,7 +11,9 @@ from pathlib import Path
 import uuid
 import websockets
 
-from .sync_logger import ClientLogger
+from src.utils.cooldown import Cooldown
+
+from ..utils.message_logger import MessageLogger, MessageLoggerImpl
 
 
 pronouns = [
@@ -712,12 +714,12 @@ class ClientsBatch:
         client_count: int,
         msg_delay: float,
         msg_delay_shift: float,
-        logger: ClientLogger,
+        logger: MessageLogger,
     ):
 
         cls.clients = {
             asyncio.create_task(
-                test_chat_client(
+                run_chat_bot(
                     port=port,
                     room_id=room_id,
                     msg_delay=msg_delay,
@@ -743,9 +745,9 @@ class ClientsBatch:
                 task.cancel()
 
 
-async def test_chat_client(
+async def run_chat_bot(
     *,
-    logger: ClientLogger,
+    logger: MessageLogger,
     port: int = 47116,
     room_id: int = 1,
     msg_delay: float = 10,
@@ -755,13 +757,14 @@ async def test_chat_client(
     encoded_username = quote(username)
     uri = f"ws://localhost:{port}/ws/messages/{room_id}/{encoded_username}"
 
-    async def send_messages():
+    async def send_messages() -> bool:
+        "return True if it needs reconnect, False otherwise"
+        print(f"sending messages started {username}")
         try:
             while True:
                 text = generate_message()
 
                 if text.strip():
-                    print(f"sending message {username} {text}")
                     sent_monotonic_ns = time.monotonic_ns()
                     await websocket.send(json.dumps({"text": text}))
                     logger.sent(text, sent_monotonic_ns)
@@ -770,13 +773,23 @@ async def test_chat_client(
 
         except websockets.exceptions.ConnectionClosed:
             print("connection closed")
+            return True
+
+        except:
+            return False
 
         finally:
             print(f"sending messages finished {username}")
 
+    cooldown = Cooldown(2.0)
+
     try:
-        async with websockets.connect(uri) as websocket:
-            await send_messages()
+        while True:
+            await cooldown.wait()
+            async with websockets.connect(uri) as websocket:
+                needs_reconnect = await send_messages()
+                if not needs_reconnect:
+                    break
 
     except websockets.exceptions.WebSocketException as e:
         print(f"❌ Connection failed: {e}")
@@ -795,16 +808,12 @@ async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-id", "-i", type=int, default=1, dest="run_id")
     parser.add_argument("--port", "-p", type=int, default=47116)
-    parser.add_argument("--room", "-r", type=int, default=None)
+    parser.add_argument("--room", "-r", type=int, default=1)
     parser.add_argument("--clients", "-c", type=int, default=1)
     parser.add_argument("--delay", type=float, default=10, dest="msg_delay")
     parser.add_argument("--delay-shift", type=float, default=10, dest="msg_delay_shift")
     parsed = parser.parse_args()
     program_name = parser.prog
-
-    if parsed.room is None:
-        print(f"room id expected. Pass it with `{program_name} --room <id>`")
-        exit(1)
         
     run_id: int = parsed.run_id
     room_id = parsed.room
@@ -818,7 +827,7 @@ async def main():
             client_count,
             parsed.msg_delay,
             parsed.msg_delay_shift,
-            logger=ClientLogger(Path("log") / f"spam_bots-{run_id}.txt")
+            logger=MessageLoggerImpl(Path("log") / f"spam_bots-{run_id}.txt")
         )
     except asyncio.CancelledError:
         pass
