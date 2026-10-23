@@ -1,4 +1,5 @@
 import argparse
+from contextlib import asynccontextmanager
 import os
 
 from fastapi import FastAPI, Request, status
@@ -9,8 +10,15 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from .api.routers.messages import router as messages_router
 from .api.routers.rooms import router as rooms_router
 from .chat_service.core.exceptions import RepoError, RoomNotFoundError
+from .api import dependencies
 
-app = FastAPI()
+@asynccontextmanager
+async def fastapi_lifespan(app: FastAPI):
+    yield
+    if dependencies._message_logger:
+        dependencies._message_logger.close()
+
+app = FastAPI(lifespan=fastapi_lifespan)
 app.include_router(messages_router)
 app.include_router(rooms_router)
 
