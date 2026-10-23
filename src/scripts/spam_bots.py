@@ -1,4 +1,5 @@
 import argparse
+import multiprocessing as mp
 import asyncio
 from hashlib import sha256
 import hashlib
@@ -700,45 +701,44 @@ def generate_full_name(include_middle=True, include_suffix=False, gender=None):
 
 
 class ClientsBatch:
-    clients: ClassVar[set[asyncio.Task]] = set()
+    def __init__(self):
+        self.clients: set[asyncio.Task] = set()
 
-    @classmethod
-    def count_active_clients(cls) -> int:
-        return sum([not c.done() for c in cls.clients])
+    def count_active_clients(self) -> int:
+        return sum([not c.done() for c in self.clients])
 
-    @classmethod
     async def run(
-        cls,
+        self,
         port: int,
         room_id: int,
         client_count: int,
         msg_delay: float,
         msg_delay_shift: float,
-        logger: MessageLogger,
+        logger_path: Path,
     ):
 
-        cls.clients = {
+        self.clients = {
             asyncio.create_task(
                 run_chat_bot(
                     port=port,
                     room_id=room_id,
                     msg_delay=msg_delay,
                     msg_delay_shift=msg_delay_shift,
-                    logger=logger,
+                    logger=MessageLoggerImpl(logger_path),
                 )
             )
             for _ in range(client_count)
         }
 
-        pending: set[asyncio.Task] = cls.clients
+        pending: set[asyncio.Task] = self.clients
         try:
             while pending:
                 _, pending = await asyncio.wait(
                     pending,
                     return_when=asyncio.FIRST_COMPLETED,
                 )
-                cls.clients = pending
-                print(f"Still have {cls.count_active_clients()} clients")
+                self.clients = pending
+                print(f"Still have {self.count_active_clients()} clients")
 
         finally:
             for task in pending:
@@ -804,34 +804,92 @@ async def run_chat_bot(
         print(f"Closed client connection ({username=})")
 
 
-async def main():
+def split_count(total: int, parts: int) -> list[int]:
+    """Делит total на parts частей, разница не больше 1."""
+    base, rem = divmod(total, parts)
+    return [base + (1 if i < rem else 0) for i in range(parts)]
+
+
+def _run_batch_in_process(
+    port: int,
+    room_id: int,
+    client_count: int,
+    msg_delay: float,
+    msg_delay_shift: float,
+    logger_path: Path,
+) -> None:
+    """Точка входа для дочернего процесса: свой event loop, свой ClientsBatch."""
+    async def _main() -> None:
+        try:
+            await ClientsBatch().run(
+                port,
+                room_id,
+                client_count,
+                msg_delay,
+                msg_delay_shift,
+                logger_path=logger_path,
+            )
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(_main())
+
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-id", "-i", type=int, default=1, dest="run_id")
     parser.add_argument("--port", "-p", type=int, default=47116)
     parser.add_argument("--room", "-r", type=int, default=1)
     parser.add_argument("--clients", "-c", type=int, default=1)
+    parser.add_argument("--processes", "-P", type=int, default=1,
+                        help="Number of worker processes to split clients across.")
     parser.add_argument("--delay", type=float, default=10, dest="msg_delay")
     parser.add_argument("--delay-shift", type=float, default=10, dest="msg_delay_shift")
     parsed = parser.parse_args()
-    program_name = parser.prog
-        
+
     run_id: int = parsed.run_id
     room_id = parsed.room
     client_count: int = parsed.clients
     port: int = parsed.port
+    processes: int = parsed.processes
+
+    logger_path = Path("log") / f"spam_bots-{run_id}.txt"
+
+    if processes <= 1:
+        # один процесс — можно просто asyncio.run, без mp overhead
+        _run_batch_in_process(
+            port, room_id, client_count,
+            parsed.msg_delay, parsed.msg_delay_shift, logger_path,
+        )
+        return
+
+    counts = split_count(client_count, processes)
+
+    procs: list[mp.Process] = []
+    for i, count in enumerate(counts):
+        p = mp.Process(
+            target=_run_batch_in_process,
+            args=(port, room_id, count, parsed.msg_delay, parsed.msg_delay_shift, logger_path),
+            name=f"batch-{i}",
+        )
+        p.start()
+        procs.append(p)
+        print(f"Started {p.name} pid={p.pid} with {count} clients")
 
     try:
-        await ClientsBatch.run(
-            port,
-            room_id,
-            client_count,
-            parsed.msg_delay,
-            parsed.msg_delay_shift,
-            logger=MessageLoggerImpl(Path("log") / f"spam_bots-{run_id}.txt")
-        )
-    except asyncio.CancelledError:
-        pass
+        for p in procs:
+            p.join()
+    except KeyboardInterrupt:
+        print("Interrupt received, terminating children...")
+        for p in procs:
+            if p.is_alive():
+                p.terminate()
+        for p in procs:
+            p.join(timeout=5)
+            if p.is_alive():
+                p.kill()
+                p.join()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
