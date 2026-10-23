@@ -7,6 +7,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ValidationError
+from starlette.websockets import WebSocketDisconnected
 import websockets
 
 from src.utils.message_logger import MessageLogger
@@ -194,7 +195,7 @@ async def _receive_new_messages(
                 )
                 continue
 
-    except WebSocketDisconnect:
+    except WebSocketDisconnect, WebSocketDisconnected:
         pass
 
     except Exception:
