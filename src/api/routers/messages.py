@@ -135,7 +135,7 @@ async def _send_new_messages_task(
     )
 
     async def send_messages():
-        timeout = 2.0
+        timeout = 0.25
         async for msg in message_generator:
             start = time.monotonic()
             try:
