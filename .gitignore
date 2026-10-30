@@ -3,5 +3,5 @@
 .pytest_cache
 icons.json
 __pycache__
-./temp
+temp
 log
