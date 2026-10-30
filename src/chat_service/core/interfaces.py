@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import AsyncGenerator, Protocol, TypeVar
+from typing import Protocol, TypeVar
 
 from .models import Message, Room, RoomJoinResult
 
-
 # ------------------------- Use Cases --------------------------- #
+
 
 class RoomsGetUseCase(ABC):
     @abstractmethod
@@ -16,9 +17,14 @@ class RoomsGetUseCase(ABC):
         # Просто проксируем ответ из репозитория
         ...
 
+
 class RoomJoinUseCase(ABC):
     @abstractmethod
-    async def use(self, room_id: int, username: str, ) -> RoomJoinResult:
+    async def use(
+        self,
+        room_id: int,
+        username: str,
+    ) -> RoomJoinResult:
         """
         :raises RoomNotFoundError:
         :raises RepoError:
@@ -27,9 +33,14 @@ class RoomJoinUseCase(ABC):
         # Создаём сообщение о новом входе
         ...
 
+
 class RoomLeaveUseCase(ABC):
     @abstractmethod
-    async def use(self, room_id: int, username: str, ) -> bool:
+    async def use(
+        self,
+        room_id: int,
+        username: str,
+    ) -> bool:
         """
         :raises RoomNotFoundError:
         :raises RepoError:
@@ -39,9 +50,14 @@ class RoomLeaveUseCase(ABC):
         # Разрываем listen
         ...
 
+
 class RoomCreateUseCase(ABC):
     @abstractmethod
-    async def use(self, room_name: str, username: str, ) -> Room:
+    async def use(
+        self,
+        room_name: str,
+        username: str,
+    ) -> Room:
         """
         :raises RepoElementAlreadyExists:
         :raises RepoError:
@@ -49,19 +65,30 @@ class RoomCreateUseCase(ABC):
         # Создаём комнату
         # Создаём сообщение о создании
         ...
-        
+
+
 class MessageSendUseCase(ABC):
     @abstractmethod
-    async def use(self, room_id: int, username: str, text: str, ) -> None:
+    async def use(
+        self,
+        room_id: int,
+        username: str,
+        text: str,
+    ) -> None:
         """
         :raises RepoError:
         """
         # Создаём новое сообщение
         ...
 
+
 class ListenNewMessagesUseCase(ABC):
     @abstractmethod
-    def use(self, room_id: int, username: str, ) -> AsyncGenerator[Message, None]:
+    def use(
+        self,
+        room_id: int,
+        username: str,
+    ) -> AsyncGenerator[Message, None]:
         """
         :raises MessageAlreadyListening:
         :raises RepoError:
@@ -79,18 +106,21 @@ class ChatService:
     send_message: MessageSendUseCase
     listen_new_messages: ListenNewMessagesUseCase
 
+
 # ------------------------- Business-Logic --------------------------- #
 
 
 class MessageListener(ABC):
     @abstractmethod
-    def listen(self, room_id: int, username: str) -> AsyncGenerator[Message, None]:
+    def listen(
+        self, room_id: int, username: str
+    ) -> AsyncGenerator[Message, None]:
         """
         :raises MessageAlreadyListening:
         :raises RepoError:
         """
         ...
-        
+
     @abstractmethod
     async def break_listen(self, room_id: int, username: str) -> bool:
         """
@@ -100,6 +130,7 @@ class MessageListener(ABC):
 
 
 # -------------------------  Repositories  --------------------------- #
+
 
 class RoomRepo(ABC):
     @abstractmethod
@@ -124,7 +155,11 @@ class RoomRepo(ABC):
         ...
 
     @abstractmethod
-    async def create(self, room_name: str, username: str, ) -> Room:
+    async def create(
+        self,
+        room_name: str,
+        username: str,
+    ) -> Room:
         """
         :raises RepoElementAlreadyExists:
         :raises RepoError:
@@ -153,24 +188,26 @@ class MessageRepo(ABC):
         :raises RepoError:
         """
         ...
-    
+
     @abstractmethod
     async def get_recent(self, room_id: int, limit: int = 50) -> list[Message]:
         """
         :raises RepoError:
         """
         ...
-    
+
     @abstractmethod
-    async def listen_new(self, room_id: int) -> tuple[AsyncGenerator[Message, None], MessageSubscription]:
+    async def listen_new(
+        self, room_id: int
+    ) -> tuple[AsyncGenerator[Message, None], MessageSubscription]:
         """
         Async Generator can raise ListenTimeoutError, RepoError
-        
+
         :raises RepoError:
         """
         ...
 
- 
+
 class PresenceRepo(ABC):
     @abstractmethod
     async def add(self, room_id: int, username: str) -> bool:
@@ -178,18 +215,17 @@ class PresenceRepo(ABC):
         :raises RepoError:
         """
         ...
-    
+
     @abstractmethod
     async def remove(self, room_id: int, username: str) -> bool:
         """
         :raises RepoError:
         """
         ...
-    
+
     @abstractmethod
     async def get_all(self, room_id: int) -> list[str]:
         """
         :raises RepoError:
         """
         ...
-    

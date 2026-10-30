@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, Self
 
 
 @dataclass
@@ -23,7 +23,7 @@ class UserMessage:
 
     @property
     def is_persisted(self) -> bool:
-        """Проверка, сохранено ли сообщение в БД"""
+        "Whether present in the data base"
         return self.id is not None
 
     def serialize(self) -> dict[str, Any]:
@@ -38,7 +38,7 @@ class UserMessage:
         return result
 
     @classmethod
-    def deserialize(cls, data: dict[str, Any]) -> "UserMessage":
+    def deserialize(cls, data: dict[str, Any]) -> Self:
         return cls(
             id=data.get("id"),
             text=data["text"],

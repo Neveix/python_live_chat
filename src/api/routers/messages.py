@@ -1,26 +1,24 @@
 import asyncio
+import logging
+import time
 from datetime import datetime
 from enum import IntEnum, StrEnum
-import time
-import traceback
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ValidationError
 from starlette.websockets import WebSocketDisconnected
-import websockets
 
 from src.utils.message_logger import MessageLogger
 
 from ... import metrics
-
 from ...chat_service.core.exceptions import RepoError, RoomNotFoundError
+from ...chat_service.core.interfaces import ChatService
 from ...chat_service.core.models import Message, RoomJoinResult, UserMessage
 from ..dependencies import get_chat_service, get_message_logger
-from ...chat_service.core.interfaces import ChatService
-
 
 router = APIRouter(prefix="")
+logger = logging.getLogger(__name__)
 
 
 class IngoingMessage(BaseModel):
@@ -141,13 +139,17 @@ async def _send_new_messages_task(
             try:
                 await asyncio.wait_for(
                     websocket.send_text(
-                        make_outgoing_message_from_message(msg).model_dump_json()
+                        make_outgoing_message_from_message(
+                            msg
+                        ).model_dump_json()
                     ),
-                    timeout = timeout,
+                    timeout=timeout,
                 )
                 metrics.MSG_SENT.inc()
-            except asyncio.TimeoutError:
-                print(f"message sending aborted after {timeout} seconds of waiting")
+            except TimeoutError:
+                print(
+                    f"message sending aborted after {timeout} seconds of waiting"
+                )
             finally:
                 metrics.SEND_LATENCY.observe(time.monotonic() - start)
 
@@ -186,20 +188,17 @@ async def _receive_new_messages(
                     room_id=room_id, username=username, text=message.text
                 )
 
-            except RepoError as e:
+            except RepoError:
                 await websocket.send_text(
                     ErrorMessage(
                         error_type=ErrorType.IngoingMessageError,
-                        detail=f"Internal Server Error",
+                        detail="Internal Server Error",
                     ).model_dump_json()
                 )
                 continue
 
     except WebSocketDisconnect, WebSocketDisconnected:
         pass
-
-    except Exception:
-        raise
 
     finally:
         send_task.cancel()
@@ -220,8 +219,8 @@ async def messages_websocket(
     websocket: WebSocket,
     room_id: int,
     username: str,
-    chat_service: ChatService = Depends(get_chat_service),
-    message_logger: MessageLogger = Depends(get_message_logger),
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
+    message_logger: Annotated[MessageLogger, Depends(get_message_logger)],
 ):
     await websocket.accept()
 
@@ -234,23 +233,27 @@ async def messages_websocket(
     try:
         await _send_history(websocket, join_result)
 
-        send_task = await _send_new_messages_task(websocket, chat_service, room_id, username)
-
-        await _receive_new_messages(
-            websocket, chat_service, room_id, username, send_task, message_logger,
+        send_task = await _send_new_messages_task(
+            websocket, chat_service, room_id, username
         )
 
-    except:
-        tb = traceback.format_exc()
-        print(f"in messages_websocket unknown exception caught, traceback:\n{tb}")
+        await _receive_new_messages(
+            websocket,
+            chat_service,
+            room_id,
+            username,
+            send_task,
+            message_logger,
+        )
+
+    except Exception:
+        logger.exception(
+            "messages_websocket unknown exception caught (room=%s, user=%s)",
+            room_id,
+            username,
+        )
 
     finally:
         await _leave_room(chat_service, room_id, username)
 
-        if websocket.state == websockets.State.OPEN:
-            # await websocket.close()
-            ...
-
         metrics.ACTIVE_WS.dec()
-
-

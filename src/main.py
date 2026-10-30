@@ -1,16 +1,25 @@
-import argparse
+import logging
 from contextlib import asynccontextmanager
-import os
+from datetime import datetime
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
 from prometheus_fastapi_instrumentator import Instrumentator
+from pydantic import BaseModel
 
+from .api import dependencies
 from .api.routers.messages import router as messages_router
 from .api.routers.rooms import router as rooms_router
 from .chat_service.core.exceptions import RepoError, RoomNotFoundError
-from .api import dependencies
+
+filename = datetime.now().strftime("%Y-%m-%d_%H:%M:%S.log")
+
+logging.basicConfig(
+    filename="log/runs/" + filename,
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+
 
 @asynccontextmanager
 async def fastapi_lifespan(app: FastAPI):
@@ -18,11 +27,13 @@ async def fastapi_lifespan(app: FastAPI):
     if dependencies._message_logger:
         dependencies._message_logger.close()
 
+
 app = FastAPI(lifespan=fastapi_lifespan)
 app.include_router(messages_router)
 app.include_router(rooms_router)
 
 Instrumentator().instrument(app).expose(app)
+
 
 class RegularExceptionInfo(BaseModel):
     error_type: str
@@ -30,7 +41,9 @@ class RegularExceptionInfo(BaseModel):
 
 
 @app.exception_handler(RoomNotFoundError)
-async def handle_room_not_found_error(request: Request, exc: RoomNotFoundError):
+async def handle_room_not_found_error(
+    request: Request, exc: RoomNotFoundError
+):
     room_id = request.path_params.get("room_id")
     room_id_str = "" if room_id is None else f"{room_id} "
     detail = f"Room {room_id_str} not found"
