@@ -12,7 +12,11 @@ python -m venv .venv
 ```
 4) Активируйте
 `source .venv/bin/activate`
-5) Запустите
+5) Установите зависимости
+```bash
+pip install -r requirements.txt
+```
+6) Запустите
 ```bash
 ./run.sh
 ```
@@ -24,6 +28,7 @@ cd python_live_chat
 sudo pacman -S redis
 python -m venv .venv
 source .venv/bin/activate
+pip install -r requirements.txt
 ./run.sh
 ```
 
